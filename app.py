@@ -107,7 +107,7 @@ st.progress(fortschritt)
 st.divider()
 
 # ==========================================
-# 5. KI MULTI-UPLOAD (ZUSAMMENRECHNEN + ALLE BILDER SPEICHERN)
+# 5. KI MULTI-UPLOAD (MIT AUTO-JPEG-KONVERTIERUNG)
 # ==========================================
 st.subheader("📸 Mahlzeit tracken")
 
@@ -132,32 +132,39 @@ if uploaded_files:
     zusatz_info = st.text_input("💡 Zusatzinfos zu den Zutaten:", placeholder="z.B. 2 Scheiben Brot, 1 EL Soße, 2 Scheiben Käse...")
     
     if st.button("🚀 Gesamte Mahlzeit zusammenrechnen & speichern", use_container_width=True):
-        with st.spinner("KI rechnet alle Zutaten zu einer Mahlzeit zusammen..."):
+        with st.spinner("KI analysiert und konvertiert die Bilder..."):
             try:
                 ai_contents = []
                 alle_bilder_base64 = []
                 
-                # Wir gehen durch alle Bilder durch
                 for file in uploaded_files:
                     image = Image.open(file)
+                    
+                    # JETZT NEU: Jedes Bild wird rigoros in RGB umgewandelt (löscht PNG-Transparenzen & HEIC-Reste)
+                    if image.mode in ("RGBA", "P"):
+                        image = image.convert("RGB")
+                    elif image.mode != "RGB":
+                        image = image.convert("RGB")
+                        
                     img_byte_arr = io.BytesIO()
-                    image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+                    # Wir erzwingen hier STRIKT das Standard-JPEG-Format für Google
+                    image.save(img_byte_arr, format='JPEG', quality=85)
                     img_bytes = img_byte_arr.getvalue()
                     
-                    # Jedes einzelne Bild in Base64 umwandeln und in der Liste sammeln
+                    # In Base64 für Supabase umwandeln
                     b64_str = base64.b64encode(img_bytes).decode('utf-8')
                     alle_bilder_base64.append(b64_str)
                     
+                    # Hier übergeben wir es Google jetzt als absolut sauberes image/jpeg
                     ai_contents.append({
-                        "mime_type": f"image/{image.format.lower() if image.format else 'jpeg'}",
+                        "mime_type": "image/jpeg",
                         "data": img_bytes
                     })
                 
-                # Alle Bilder-Texte mit einem Komma verbinden, um sie zusammen in EINER Tabellenzelle zu speichern
                 bilder_string_fuer_db = ",".join(alle_bilder_base64)
                 
                 prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
-                Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit (z.B. die Komponenten eines Burgers, belegten Brots oder Gerichts).
+                Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
                 
                 Kritische Nutzer-Zusatzinfo: "{zusatz_info}"
                 
@@ -165,7 +172,7 @@ if uploaded_files:
                 1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
                 2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
                 3. Ziehe im Zweifel gedanklich immer 25% bis 30% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
-                4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht (z.B. 'Belegtes Käsebrot mit Soße').
+                4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
                 
                 Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
                 {{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}}"""
@@ -187,8 +194,6 @@ if uploaded_files:
                 
             except Exception as e:
                 st.error(f"Fehler bei der Analyse. Details: {e}")
-
-st.divider()
 
 # ==========================================
 # 6. HEUTIGE MAHLZEITEN (PRO MAHLZEIT ALLE BILDER ANZEIGEN)
