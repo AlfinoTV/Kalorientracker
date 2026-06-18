@@ -130,7 +130,7 @@ if uploaded_files:
             img = Image.open(file)
             st.image(img, caption=f"Zutat {idx+1}", use_container_width=True)
 
-# 2. Option: TEXTFELD (Jetzt mit dynamischem Key zum automatischen Leeren!)
+# 2. Option: TEXTFELD (Mit dynamischem Key zum automatischen Leeren)
 text_mahlzeit = st.text_input(
     "✍️ Oder tippe hier ein, was du gegessen hast:", 
     placeholder="z.B. Ein halber Döner mit Knoblauchsoße oder 250g Quark mit Banane...",
@@ -173,24 +173,60 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                         })
                     bilder_string_fuer_db = ",".join(alle_bilder_base64)
                     
-                    prompt = (
-                        "Du bist ein professioneller Ernährungsberater und Kalorien-Experte.\n"
-                        f"Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.\n\n"
-                        f"Kritische Nutzer-Zusatzinfo: \"{zusatz_info}\"\n\n"
-                        "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
-                        "1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.\n"
-                        "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
-                        "3. Ziehe im Zweifel gedanklich immer 25% bis 30% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).\n"
-                        "4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.\n\n"
-                        "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
-                        '{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}'
-                    )
+# DIESER PROMPT IST JETZT LINKSBÜNDIG UND SICHER VOR FEHLERN
+                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte.
+Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
+
+Kritische Nutzer-Zusatzinfo: "{zusatz_info}"
+
+⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
+1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
+2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
+3. Ziehe im Zweifel gedanklich immer 25% bis 30% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
+4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
+
+Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
+{{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}}"""
                 
                 # --- WEG B: Es wurde NUR TEXT eingegeben ---
                 else:
-                    prompt = (
-                        "Du bist ein professioneller Ernährungsberater und Kalorien-Experte.\n"
-                        f"Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: \"{text_mahlzeit}\"\n\n
+# AUCH DIESER PROMPT IST SICHRE FORMARTIERT
+                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte.
+Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: "{text_mahlzeit}"
+
+⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
+1. Berechne die Kalorien für diese beschriebene Mahlzeit.
+2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
+3. Ziehe im Zweifel gedanklich immer 25% bis 30% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus.
+4. Nutze als Namen das Gericht (korrigiere eventuell nur Tippfehler).
+
+Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
+{{"gericht": "Name des Gerichts auf Deutsch", "kalorien": 400}}"""
+
+                ai_contents.insert(0, prompt)
+                
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(ai_contents)
+                
+                # Sichere Reinigung
+                clean_text = response.text.strip()
+                if "```json" in clean_text:
+                    clean_text = clean_text.split("```json")[1]
+                if "```" in clean_text:
+                    clean_text = clean_text.split("```")[0]
+                clean_text = clean_text.strip()
+                
+                daten = json.loads(clean_text)
+                
+                add_mahlzeit(daten['gericht'], daten['kalorien'], bilder_string_fuer_db)
+                
+                # Erhöhung des Zählers leert Uploader UND Textfeld
+                st.session_state["file_uploader_key"] += 1
+                st.success(f"Erfolgreich eingetragen: {daten['gericht']} ({daten['kalorien']} kcal)")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Fehler bei der Analyse. Details: {e}")
                         
                 
 # ==========================================
