@@ -129,15 +129,14 @@ if uploaded_files:
             img = Image.open(file)
             st.image(img, caption=f"Zutat {idx+1}", use_container_width=True)
 
-# 2. Option: NEUES TEXTFELD für die Direkteingabe (wenn man mal kein Bild hat)
+# 2. Option: TEXTFELD für die Direkteingabe
 text_mahlzeit = st.text_input("✍️ Oder tippe hier ein, was du gegessen hast:", placeholder="z.B. Ein halber Döner mit Knoblauchsoße oder 250g Quark mit Banane...")
 
-# Die Zusatzinfos bleiben für die Bilder wichtig
+# Zusatzinfos für Bilder
 zusatz_info = st.text_input("💡 Zusatzinfos zu den Zutaten (nur für Bild-Upload wichtig):", placeholder="z.B. 2 Scheiben Brot, 1 EL Soße, 2 Scheiben Käse...")
 
-# Analyse-Button steuert jetzt beide Wege
+# Analyse-Button
 if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
-    # FEHLERSCHUTZ: Prüfen, ob überhaupt irgendwas eingegeben wurde
     if not uploaded_files and not text_mahlzeit.strip():
         st.warning("Bitte lade entweder ein Bild hoch ODER tippe im Textfeld ein, was du gegessen hast! 😉")
     else:
@@ -169,29 +168,39 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                         })
                     bilder_string_fuer_db = ",".join(alle_bilder_base64)
                     
-                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
-                    Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
-                    
-                    Kritische Nutzer-Zusatzinfo: "{zusatz_info}"
-                    
-                    ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
-                    1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
-                    2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
-                    3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
-                    4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
-                    
-                    Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
-                    {{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}}"""
+                    prompt = (
+                        "Du bist ein professioneller Ernährungsberater und Kalorien-Experte.\n"
+                        f"Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.\n\n"
+                        f"Kritische Nutzer-Zusatzinfo: \"{zusatz_info}\"\n\n"
+                        "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
+                        "1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.\n"
+                        "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
+                        "3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).\n"
+                        "4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.\n\n"
+                        "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
+                        '{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}'
+                    )
                 
                 # --- WEG B: Es wurde NUR TEXT eingegeben ---
                 else:
-                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
-                    Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: "{text_mahlzeit}"
-                    
-                    ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
-                    1. Berechne die Kalorien für diese beschriebene Mahlzeit.
-                    2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
-                    3. Ziehe im Zweifel gedanklich immer 25% bis 30% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus
+                    prompt = (
+                        "Du bist ein professioneller Ernährungsberater und Kalorien-Experte.\n"
+                        f"Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: \"{text_mahlzeit}\"\n\n"
+                        "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
+                        "1. Berechne die Kalorien für diese beschriebene Mahlzeit.\n"
+                        "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
+                        "3. Ziehe im Zweifel gedanklich immer 20% bis 25% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus.\n"
+                        "4. Nutze als Namen das Gericht (korrigiere eventuell nur Tippfehler).\n\n"
+                        "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
+                        '{"gericht": "Name des Gerichts auf Deutsch", "kalorien": 400}'
+                    )
+
+                ai_contents.insert(0, prompt)
+                
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(ai_contents)
+                
+                clean_text = response.text.replace("
 
 # ==========================================
 # 6. HEUTIGE MAHLZEITEN (PRO MAHLZEIT ALLE BILDER ANZEIGEN)
