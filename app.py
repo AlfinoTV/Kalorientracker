@@ -171,7 +171,7 @@ if uploaded_files:
                 ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
                 1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
                 2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
-                3. Ziehe im Zweifel gedanklich immer 25% bis 30% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
+                3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
                 4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
                 
                 Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
