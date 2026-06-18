@@ -175,7 +175,7 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                         "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
                         "1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.\n"
                         "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
-                        "3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).\n"
+                        "3. Ziehe im Zweifel gedanklich immer 25% bis 30% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).\n"
                         "4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.\n\n"
                         "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
                         '{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}'
@@ -189,7 +189,7 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                         "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
                         "1. Berechne die Kalorien für diese beschriebene Mahlzeit.\n"
                         "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
-                        "3. Ziehe im Zweifel gedanklich immer 20% bis 25% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus.\n"
+                        "3. Ziehe im Zweifel gedanklich immer 25% bis 30% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus.\n"
                         "4. Nutze als Namen das Gericht (korrigiere eventuell nur Tippfehler).\n\n"
                         "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
                         '{"gericht": "Name des Gerichts auf Deutsch", "kalorien": 400}'
@@ -200,12 +200,13 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content(ai_contents)
                 
-                # REINIGUNG DES TEXTES (HIER WAR DER SYNTAX-FEHLER BEHOBEN)
-                raw_text = response.text.strip()
-                raw_text = raw_text.replace("```json", "")
-                raw_text = raw_text.replace("
-```", "")
-                clean_text = raw_text.strip()
+                # SICHRE REINIGUNG: Robust ohne riskante Formatierungen
+                clean_text = response.text.strip()
+                if "```json" in clean_text:
+                    clean_text = clean_text.split("```json")[1]
+                if "```" in clean_text:
+                    clean_text = clean_text.split("```")[0]
+                clean_text = clean_text.strip()
                 
                 daten = json.loads(clean_text)
                 
