@@ -200,8 +200,24 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content(ai_contents)
                 
-                clean_text = response.text.replace("
-
+                # REINIGUNG DES TEXTES (HIER WAR DER SYNTAX-FEHLER BEHOBEN)
+                raw_text = response.text.strip()
+                raw_text = raw_text.replace("```json", "")
+                raw_text = raw_text.replace("
+```", "")
+                clean_text = raw_text.strip()
+                
+                daten = json.loads(clean_text)
+                
+                add_mahlzeit(daten['gericht'], daten['kalorien'], bilder_string_fuer_db)
+                
+                st.session_state["file_uploader_key"] += 1
+                st.success(f"Erfolgreich eingetragen: {daten['gericht']} ({daten['kalorien']} kcal)")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Fehler bei der Analyse. Details: {e}")
+                
 # ==========================================
 # 6. HEUTIGE MAHLZEITEN (PRO MAHLZEIT ALLE BILDER ANZEIGEN)
 # ==========================================
