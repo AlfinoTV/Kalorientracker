@@ -107,93 +107,91 @@ st.progress(fortschritt)
 st.divider()
 
 # ==========================================
-# 5. KI MULTI-UPLOAD (MIT AUTO-JPEG-KONVERTIERUNG)
+# 5. KI MULTI-UPLOAD ODER TEXT-INPUT TRACKER
 # ==========================================
 st.subheader("📸 Mahlzeit tracken")
 
 if "file_uploader_key" not in st.session_state:
     st.session_state["file_uploader_key"] = 0
 
+# 1. Option: Klassischer Bilder-Upload
 uploaded_files = st.file_uploader(
-    "Wähle alle Bilder deiner Zutaten aus (z.B. Brot, Soße, Käse)...", 
+    "Wähle Bilder deiner Zutaten aus (z.B. Brot, Soße, Käse)...", 
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True,
     key=f"uploader_{st.session_state['file_uploader_key']}"
 )
 
 if uploaded_files:
-    # Bilder anzeigen
     cols = st.columns(len(uploaded_files))
     for idx, file in enumerate(uploaded_files):
         with cols[idx]:
             img = Image.open(file)
             st.image(img, caption=f"Zutat {idx+1}", use_container_width=True)
-            
-    zusatz_info = st.text_input("💡 Zusatzinfos zu den Zutaten:", placeholder="z.B. 2 Scheiben Brot, 1 EL Soße, 2 Scheiben Käse...")
-    
-    if st.button("🚀 Gesamte Mahlzeit zusammenrechnen & speichern", use_container_width=True):
-        with st.spinner("KI analysiert und konvertiert die Bilder..."):
+
+# 2. Option: NEUES TEXTFELD für die Direkteingabe (wenn man mal kein Bild hat)
+text_mahlzeit = st.text_input("✍️ Oder tippe hier ein, was du gegessen hast:", placeholder="z.B. Ein halber Döner mit Knoblauchsoße oder 250g Quark mit Banane...")
+
+# Die Zusatzinfos bleiben für die Bilder wichtig
+zusatz_info = st.text_input("💡 Zusatzinfos zu den Zutaten (nur für Bild-Upload wichtig):", placeholder="z.B. 2 Scheiben Brot, 1 EL Soße, 2 Scheiben Käse...")
+
+# Analyse-Button steuert jetzt beide Wege
+if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
+    # FEHLERSCHUTZ: Prüfen, ob überhaupt irgendwas eingegeben wurde
+    if not uploaded_files and not text_mahlzeit.strip():
+        st.warning("Bitte lade entweder ein Bild hoch ODER tippe im Textfeld ein, was du gegessen hast! 😉")
+    else:
+        with st.spinner("KI berechnet deine Mahlzeit mit der Kalorienbremse..."):
             try:
                 ai_contents = []
-                alle_bilder_base64 = []
+                bilder_string_fuer_db = ""
                 
-                for file in uploaded_files:
-                    image = Image.open(file)
-                    
-                    # JETZT NEU: Jedes Bild wird rigoros in RGB umgewandelt (löscht PNG-Transparenzen & HEIC-Reste)
-                    if image.mode in ("RGBA", "P"):
-                        image = image.convert("RGB")
-                    elif image.mode != "RGB":
-                        image = image.convert("RGB")
+                # --- WEG A: Es wurden BILDER hochgeladen ---
+                if uploaded_files:
+                    alle_bilder_base64 = []
+                    for file in uploaded_files:
+                        image = Image.open(file)
+                        if image.mode in ("RGBA", "P"):
+                            image = image.convert("RGB")
+                        elif image.mode != "RGB":
+                            image = image.convert("RGB")
+                            
+                        img_byte_arr = io.BytesIO()
+                        image.save(img_byte_arr, format='JPEG', quality=85)
+                        img_bytes = img_byte_arr.getvalue()
                         
-                    img_byte_arr = io.BytesIO()
-                    # Wir erzwingen hier STRIKT das Standard-JPEG-Format für Google
-                    image.save(img_byte_arr, format='JPEG', quality=85)
-                    img_bytes = img_byte_arr.getvalue()
+                        b64_str = base64.b64encode(img_bytes).decode('utf-8')
+                        alle_bilder_base64.append(b64_str)
+                        
+                        ai_contents.append({
+                            "mime_type": "image/jpeg",
+                            "data": img_bytes
+                        })
+                    bilder_string_fuer_db = ",".join(alle_bilder_base64)
                     
-                    # In Base64 für Supabase umwandeln
-                    b64_str = base64.b64encode(img_bytes).decode('utf-8')
-                    alle_bilder_base64.append(b64_str)
+                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
+                    Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
                     
-                    # Hier übergeben wir es Google jetzt als absolut sauberes image/jpeg
-                    ai_contents.append({
-                        "mime_type": "image/jpeg",
-                        "data": img_bytes
-                    })
+                    Kritische Nutzer-Zusatzinfo: "{zusatz_info}"
+                    
+                    ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
+                    1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
+                    2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
+                    3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
+                    4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
+                    
+                    Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
+                    {{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}}"""
                 
-                bilder_string_fuer_db = ",".join(alle_bilder_base64)
-                
-                prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
-                Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
-                
-                Kritische Nutzer-Zusatzinfo: "{zusatz_info}"
-                
-                ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
-                1. Schätze die Kalorien für jede Zutat einzeln und addiere sie zu einem Gesamtwert für die MAHLZEIT.
-                2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
-                3. Ziehe im Zweifel gedanklich immer 20% bis 25% vom üblichen Standardvolumen ab. Geh vom absoluten Best-Case-Szenario aus (fettarm zubereitet, moderate Menge).
-                4. Erstelle einen passenden, zusammenfassenden Namen für das fertige Gericht.
-                
-                Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:
-                {{"gericht": "Name des fertigen Gerichts auf Deutsch", "kalorien": 400}}"""
-                
-                ai_contents.insert(0, prompt)
-                
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(ai_contents)
-                
-                clean_text = response.text.replace("```json", "").replace("```", "").strip()
-                daten = json.loads(clean_text)
-                
-                # Als EINE Mahlzeit mit ALLEN Bildern speichern
-                add_mahlzeit(daten['gericht'], daten['kalorien'], bilder_string_fuer_db)
-                
-                st.session_state["file_uploader_key"] += 1
-                st.success(f"Erfolgreich als eine Mahlzeit eingetragen: {daten['gericht']} ({daten['kalorien']} kcal)")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Fehler bei der Analyse. Details: {e}")
+                # --- WEG B: Es wurde NUR TEXT eingegeben ---
+                else:
+                    prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte. 
+                    Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: "{text_mahlzeit}"
+                    
+                    ⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:
+                    1. Berechne die Kalorien für diese beschriebene Mahlzeit.
+                    2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.
+                    3. Ziehe im Zweifel gedanklich immer 25% bis 30% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus
 
 # ==========================================
 # 6. HEUTIGE MAHLZEITEN (PRO MAHLZEIT ALLE BILDER ANZEIGEN)
