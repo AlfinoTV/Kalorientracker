@@ -111,6 +111,7 @@ st.divider()
 # ==========================================
 st.subheader("📸 Mahlzeit tracken")
 
+# Zähler für den Reset von Uploader UND Textfeld, falls noch nicht vorhanden
 if "file_uploader_key" not in st.session_state:
     st.session_state["file_uploader_key"] = 0
 
@@ -129,8 +130,12 @@ if uploaded_files:
             img = Image.open(file)
             st.image(img, caption=f"Zutat {idx+1}", use_container_width=True)
 
-# 2. Option: TEXTFELD für die Direkteingabe
-text_mahlzeit = st.text_input("✍️ Oder tippe hier ein, was du gegessen hast:", placeholder="z.B. Ein halber Döner mit Knoblauchsoße oder 250g Quark mit Banane...")
+# 2. Option: TEXTFELD (Jetzt mit dynamischem Key zum automatischen Leeren!)
+text_mahlzeit = st.text_input(
+    "✍️ Oder tippe hier ein, was du gegessen hast:", 
+    placeholder="z.B. Ein halber Döner mit Knoblauchsoße oder 250g Quark mit Banane...",
+    key=f"text_input_{st.session_state['file_uploader_key']}"
+)
 
 # Zusatzinfos für Bilder
 zusatz_info = st.text_input("💡 Zusatzinfos zu den Zutaten (nur für Bild-Upload wichtig):", placeholder="z.B. 2 Scheiben Brot, 1 EL Soße, 2 Scheiben Käse...")
@@ -185,39 +190,8 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                 else:
                     prompt = (
                         "Du bist ein professioneller Ernährungsberater und Kalorien-Experte.\n"
-                        f"Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: \"{text_mahlzeit}\"\n\n"
-                        "⚠️ STRENGE REGELN FÜR DIE SCHÄTZUNG:\n"
-                        "1. Berechne die Kalorien für diese beschriebene Mahlzeit.\n"
-                        "2. Tracke extrem streng: Schätze die Kalorien EXTREM NIEDRIG, DEFENSIV und MINIMALISTISCH.\n"
-                        "3. Ziehe im Zweifel gedanklich immer 25% bis 30% von der üblichen Standardportion ab. Geh von einer mageren Zubereitung aus.\n"
-                        "4. Nutze als Namen das Gericht (korrigiere eventuell nur Tippfehler).\n\n"
-                        "Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text drumherum:\n"
-                        '{"gericht": "Name des Gerichts auf Deutsch", "kalorien": 400}'
-                    )
-
-                ai_contents.insert(0, prompt)
-                
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(ai_contents)
-                
-                # SICHRE REINIGUNG: Robust ohne riskante Formatierungen
-                clean_text = response.text.strip()
-                if "```json" in clean_text:
-                    clean_text = clean_text.split("```json")[1]
-                if "```" in clean_text:
-                    clean_text = clean_text.split("```")[0]
-                clean_text = clean_text.strip()
-                
-                daten = json.loads(clean_text)
-                
-                add_mahlzeit(daten['gericht'], daten['kalorien'], bilder_string_fuer_db)
-                
-                st.session_state["file_uploader_key"] += 1
-                st.success(f"Erfolgreich eingetragen: {daten['gericht']} ({daten['kalorien']} kcal)")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Fehler bei der Analyse. Details: {e}")
+                        f"Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: \"{text_mahlzeit}\"\n\n
+                        
                 
 # ==========================================
 # 6. HEUTIGE MAHLZEITEN (PRO MAHLZEIT ALLE BILDER ANZEIGEN)
