@@ -298,3 +298,111 @@ else:
                     if st.button("🗑️", key=f"del_hist_{item['id']}"):
                         delete_mahlzeit(item['id'])
                         st.rerun()
+
+
+# ==========================================
+# 7. BUNTES WOCHENBERICHT-KAPITEL MIT DYNAMISCHEM ZIEL
+# ==========================================
+st.divider()
+
+# Hier erstellen wir eine kleine, einklappbare Box für die Einstellungen
+with st.expander("⚙️ Kalorienziel anpassen", expanded=False):
+    # Streamlit merkt sich die Eingabe automatisch im Browser-Speicher (Session State)
+    if "tages_ziel_kcal" not in st.session_state:
+        st.session_state["tages_ziel_kcal"] = 2000 # Standardwert, falls noch nichts eingegeben wurde
+        
+    neues_ziel = st.number_input(
+        "Dein tägliches Kalorienziel (kcal):", 
+        min_value=1200, 
+        max_value=5000, 
+        value=int(st.session_state["tages_ziel_kcal"]), 
+        step=50
+    )
+    # Wert aktualisieren, wenn er geändert wird
+    st.session_state["tages_ziel_kcal"] = neues_ziel
+
+# Berechnungen basierend auf deiner Live-Eingabe oben
+TAGES_ZIEL_KCAL = st.session_state["tages_ziel_kcal"]
+WOCHEN_ZIEL_KCAL = TAGES_ZIEL_KCAL * 7
+
+st.subheader("📊 Dein Fitness-Status")
+
+if st.button("📅 Bunten Wochenbericht anzeigen", use_container_width=True):
+    with st.spinner("Berechne Wochenübersicht mit deinem Ziel..."):
+        try:
+            # Alle Einträge aus Supabase holen
+            res = supabase.table("mahlzeiten").select("*").execute()
+            alle_eintraege = res.data
+            
+            if not alle_eintraege:
+                st.info("Noch keine Daten für einen Wochenbericht vorhanden. Trag erst ein paar Mahlzeiten ein! 🍏")
+            else:
+                import datetime
+                heute = datetime.date.today()
+                vor_einer_woche = heute - datetime.timedelta(days=7)
+                
+                wochen_kalorien = 0
+                
+                # Nur die Mahlzeiten der letzten 7 Tage zusammenrechnen
+                for mahlzeit in alle_eintraege:
+                    db_datum = datetime.datetime.strptime(mahlzeit["created_at"][:10], "%Y-%m-%d").date()
+                    if vor_einer_woche <= db_datum <= heute:
+                        wochen_kalorien += int(mahlzeit["kalorien"])
+                
+                # Berechnung der Differenz mit dem neuen, dynamischen Ziel
+                differenz = wochen_kalorien - WOCHEN_ZIEL_KCAL
+                
+                st.markdown(f"### 🏆 Dein Wochenbericht (Ziel: {TAGES_ZIEL_KCAL} kcal / Tag)")
+                
+                # Schöne bunte Kacheln für die Zahlen
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric(
+                        label="Ist-Zustand (Gegessen)", 
+                        value=f"{wochen_kalorien} kcal"
+                    )
+                    
+                with col2:
+                    st.metric(
+                        label="Soll-Zustand (Ziel)", 
+                        value=f"{WOCHEN_ZIEL_KCAL} kcal"
+                    )
+                    
+                with col3:
+                    if differenz > 0:
+                        st.metric(
+                            label="Überschuss (Zuviel)", 
+                            value=f"+{differenz} kcal", 
+                            delta=f"{differenz} kcal zu viel", 
+                            delta_color="inverse"
+                        )
+                    elif differenz < 0:
+                        st.metric(
+                            label="Defizit (Zuwenig)", 
+                            value=f"{differenz} kcal", 
+                            delta=f"{abs(differenz)} kcal übrig", 
+                            delta_color="normal"
+                        )
+                    else:
+                        st.metric(
+                            label="Punktlandung", 
+                            value="0 kcal", 
+                            delta="Perfekt getroffen!"
+                        )
+                
+                # Bunter Fortschrittsbalken
+                prozent = min(int((wochen_kalorien / WOCHEN_ZIEL_KCAL) * 100), 100) if WOCHEN_ZIEL_KCAL > 0 else 0
+                
+                st.write("")
+                st.write(f"**Fortschritt deines Wochenbudgets ({prozent}%):**")
+                
+                if wochen_kalorien > WOCHEN_ZIEL_KCAL:
+                    st.progress(1.0)
+                    st.error("⚠️ Du hast dein Wochenziel überschritten! Zeit für ein bisschen Cardio. 🏃‍♂️")
+                else:
+                    st.progress(wochen_kalorien / WOCHEN_ZIEL_KCAL)
+                    st.success("🎉 Alles im grünen Bereich! Du trackst überragend. Weiter so!")
+                    
+        except Exception as e:
+            st.error(f"Fehler beim Laden des Wochenberichts: {e}")
