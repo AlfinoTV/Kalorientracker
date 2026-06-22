@@ -399,6 +399,198 @@ if st.button("📅 Wochenbericht abrufen", use_container_width=True):
             st.error(f"Fehler beim Laden: {e}")
 
 # ==========================================
+# 7. AUTOMATISCHER WOCHENBERICHT (START: MONTAG)
+# ==========================================
+st.divider()
+st.subheader("📊 Dein Fitness-Status")
+
+# DEIN FESTES TÄGLICHES KALORIENZIEL (Hier deine Wunschzahl eintragen!)
+TAGES_ZIEL_KCAL = 2000 
+WOCHEN_ZIEL_KCAL = TAGES_ZIEL_KCAL * 7
+
+# CSS für die fliegenden Emojis (Animationen)
+st.markdown("""
+<style>
+@keyframes flyUp {
+    0% { transform: translateY(100vh) translateX(0); opacity: 1; }
+    50% { transform: translateY(50vh) translateX(30px); }
+    100% { transform: translateY(-10vh) translateX(-30px); opacity: 0; }
+}
+.emoji-stream {
+    position: fixed; left: 50%; top: 0; width: 100%; height: 100vh;
+    pointer-events: none; z-index: 9999; overflow: hidden;
+}
+.animated-emoji {
+    position: absolute; font-size: 3rem;
+    animation: flyUp 4s linear infinite;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if st.button("📅 Wochenbericht abrufen", use_container_width=True):
+    with st.spinner("Berechne Übersicht ab Montag..."):
+        try:
+            res = supabase.table("mahlzeiten").select("*").execute()
+            alle_eintraege = res.data
+            
+            if not alle_eintraege:
+                st.info("Noch keine Daten für die aktuelle Woche vorhanden.")
+            else:
+                import datetime
+                heute = datetime.date.today()
+                
+                # Jetzige Woche berechnen: Wir finden den letzten Montag heraus
+                # heute.weekday() ist 0 für Montag, 1 für Dienstag, etc.
+                letzter_montag = heute - datetime.timedelta(days=heute.weekday())
+                
+                wochen_kalorien = 0
+                for mahlzeit in alle_eintraege:
+                    db_datum = datetime.datetime.strptime(mahlzeit["created_at"][:10], "%Y-%m-%d").date()
+                    # Wir zählen nur Mahlzeiten, die seit diesem Montag (inklusive) gegessen wurden
+                    if letzter_montag <= db_datum <= heute:
+                        wochen_kalorien += int(mahlzeit["kalorien"])
+                
+                differenz = wochen_kalorien - WOCHEN_ZIEL_KCAL
+                
+                st.markdown(f"### 🏆 Aktueller Bericht (Seit Montag | Ziel: {TAGES_ZIEL_KCAL} kcal / Tag)")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(label="Ist (Gegessen)", value=f"{wochen_kalorien} kcal")
+                with col2:
+                    st.metric(label="Soll (Ziel)", value=f"{WOCHEN_ZIEL_KCAL} kcal")
+                with col3:
+                    if differenz < 0:
+                        # Zu wenig gegessen -> ROT leuchtend
+                        st.metric(
+                            label="Defizit (Zuwenig)", 
+                            value=f"{differenz} kcal", 
+                            delta=f"{abs(differenz)} kcal zu wenig!", 
+                            delta_color="inverse" 
+                        )
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:20%; animation-delay:0s;">😭</span>'
+                                    '<span class="animated-emoji" style="left:40%; animation-delay:1s;">😢</span>'
+                                    '<span class="animated-emoji" style="left:60%; animation-delay:0.5s;">😭</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.warning("⚠️ Achtung: Du hast zu wenig gegessen! Pack dir ruhig noch was auf den Teller.")
+                        
+                    elif differenz == 0:
+                        # Exakt getroffen -> GRÜN + Hervorragend
+                        st.metric(label="Punktlandung", value="0 kcal", delta="Hervorragend!", delta_color="normal")
+                        st.balloons()
+                        st.success("🎉 Hervorragend! Punktlandung vollbracht!")
+                        
+                    else:
+                        # Zu viel gegessen -> Schulterzucken + Nicht schlimm
+                        st.metric(label="Überschuss (Zuviel)", value=f"+{differenz} kcal", delta=f"{differenz} kcal drüber", delta_color="off")
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:30%; animation-delay:0s;">🤷‍♂️</span>'
+                                    '<span class="animated-emoji" style="left:50%; animation-delay:1.2s;">🤷</span>'
+                                    '<span class="animated-emoji" style="left:70%; animation-delay:0.6s;">🤷‍♀️</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.info("🤷 Nicht schlimm! Morgen wird einfach wieder normal weitergetrackt.")
+                        
+        except Exception as e:
+            st.error(f"Fehler beim Laden: {e}")
+
+# ==========================================
+# 7. AUTOMATISCHER WOCHENBERICHT (START: MONTAG)
+# ==========================================
+st.divider()
+st.subheader("📊 Dein Fitness-Status")
+
+# DEIN FESTES TÄGLICHES KALORIENZIEL (Hier deine Wunschzahl eintragen!)
+TAGES_ZIEL_KCAL = 1300 
+WOCHEN_ZIEL_KCAL = TAGES_ZIEL_KCAL * 7
+
+# CSS für die fliegenden Emojis (Animationen)
+st.markdown("""
+<style>
+@keyframes flyUp {
+    0% { transform: translateY(100vh) translateX(0); opacity: 1; }
+    50% { transform: translateY(50vh) translateX(30px); }
+    100% { transform: translateY(-10vh) translateX(-30px); opacity: 0; }
+}
+.emoji-stream {
+    position: fixed; left: 50%; top: 0; width: 100%; height: 100vh;
+    pointer-events: none; z-index: 9999; overflow: hidden;
+}
+.animated-emoji {
+    position: absolute; font-size: 3rem;
+    animation: flyUp 4s linear infinite;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if st.button("📅 Wochenbericht abrufen", use_container_width=True):
+    with st.spinner("Berechne Übersicht ab Montag..."):
+        try:
+            res = supabase.table("mahlzeiten").select("*").execute()
+            alle_eintraege = res.data
+            
+            if not alle_eintraege:
+                st.info("Noch keine Daten für die aktuelle Woche vorhanden.")
+            else:
+                import datetime
+                heute = datetime.date.today()
+                
+                # Jetzige Woche berechnen: Wir finden den letzten Montag heraus
+                # heute.weekday() ist 0 für Montag, 1 für Dienstag, etc.
+                letzter_montag = heute - datetime.timedelta(days=heute.weekday())
+                
+                wochen_kalorien = 0
+                for mahlzeit in alle_eintraege:
+                    db_datum = datetime.datetime.strptime(mahlzeit["created_at"][:10], "%Y-%m-%d").date()
+                    # Wir zählen nur Mahlzeiten, die seit diesem Montag (inklusive) gegessen wurden
+                    if letzter_montag <= db_datum <= heute:
+                        wochen_kalorien += int(mahlzeit["kalorien"])
+                
+                differenz = wochen_kalorien - WOCHEN_ZIEL_KCAL
+                
+                st.markdown(f"### 🏆 Aktueller Bericht (Seit Montag | Ziel: {TAGES_ZIEL_KCAL} kcal / Tag)")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(label="Ist (Gegessen)", value=f"{wochen_kalorien} kcal")
+                with col2:
+                    st.metric(label="Soll (Ziel)", value=f"{WOCHEN_ZIEL_KCAL} kcal")
+                with col3:
+                    if differenz < 0:
+                        # Zu wenig gegessen -> ROT leuchtend
+                        st.metric(
+                            label="Defizit (Zuwenig)", 
+                            value=f"{differenz} kcal", 
+                            delta=f"{abs(differenz)} kcal zu wenig!", 
+                            delta_color="inverse" 
+                        )
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:20%; animation-delay:0s;">😭</span>'
+                                    '<span class="animated-emoji" style="left:40%; animation-delay:1s;">😢</span>'
+                                    '<span class="animated-emoji" style="left:60%; animation-delay:0.5s;">😭</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.warning("⚠️ Achtung: Du hast zu wenig gegessen! Pack dir ruhig noch was auf den Teller.")
+                        
+                    elif differenz == 0:
+                        # Exakt getroffen -> GRÜN + Hervorragend
+                        st.metric(label="Punktlandung", value="0 kcal", delta="Hervorragend!", delta_color="normal")
+                        st.balloons()
+                        st.success("🎉 Hervorragend! Punktlandung vollbracht!")
+                        
+                    else:
+                        # Zu viel gegessen -> Schulterzucken + Nicht schlimm
+                        st.metric(label="Überschuss (Zuviel)", value=f"+{differenz} kcal", delta=f"{differenz} kcal drüber", delta_color="off")
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:30%; animation-delay:0s;">🤷‍♂️</span>'
+                                    '<span class="animated-emoji" style="left:50%; animation-delay:1.2s;">🤷</span>'
+                                    '<span class="animated-emoji" style="left:70%; animation-delay:0.6s;">🤷‍♀️</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.info("🤷 Nicht schlimm! Morgen wird einfach wieder normal weitergetrackt.")
+                        
+        except Exception as e:
+            st.error(f"Fehler beim Laden: {e}")
+
+# ==========================================
 # AUTOMATISCHER FIXER WOCHENVERLAUF (ARCHIV)
 # ==========================================
 st.write("")
@@ -412,7 +604,6 @@ try:
         import datetime
         from collections import defaultdict
         
-        # Mahlzeiten nach Kalenderwochen (KW) gruppieren
         wochen_gruppen = defaultdict(list)
         
         for mahlzeit in alle_daten:
@@ -420,15 +611,11 @@ try:
             jahr, kw, _ = db_datum.isocalendar()
             wochen_gruppen[f"Jahr {jahr} - Kalenderwoche {kw}"].append(mahlzeit)
             
-        # Jede Woche kompakt als aufklappbaren Verlauf anzeigen (wie Schritt 6)
         for woche_name, mahlzeiten_der_woche in sorted(wochen_gruppen.items(), reverse=True):
             gesamte_wochen_kcal = sum(int(m["kalorien"]) for m in mahlzeiten_der_woche)
-            
-            # Berechnung des Soll-Werts für diese Woche
             wochen_soll = WOCHEN_ZIEL_KCAL
             diff = gesamte_wochen_kcal - wochen_soll
             
-            # Status-Text für die Kopfzeile ermitteln
             if diff < 0:
                 status_text = f"🔴 {gesamte_wochen_kcal} kcal / {wochen_soll} kcal (Zu wenig)"
             elif diff == 0:
@@ -436,14 +623,12 @@ try:
             else:
                 status_text = f"⚪ {gesamte_wochen_kcal} kcal / {wochen_soll} kcal (Nicht schlimm)"
                 
-            # Kleiner kompakter Klapptext (Expander)
             with st.expander(f"📅 {woche_name} ➔ {status_text}"):
                 st.write(f"**Zusammenfassung:**")
                 st.write(f"• Insgesamt gegessen: `{gesamte_wochen_kcal} kcal`")
                 st.write(f"• Wochen-Soll: `{wochen_soll} kcal`")
                 st.write(f"• Abweichung: `{diff} kcal`")
                 
-                # Zeigt die einzelnen Mahlzeiten dieser Woche kurz als Liste an
                 st.write("**Details dieser Woche:**")
                 for m in mahlzeiten_der_woche:
                     st.write(f"• {m['created_at'][:10]} | *{m['gericht']}* ({m['kalorien']} kcal)")
