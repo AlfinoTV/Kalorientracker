@@ -107,11 +107,10 @@ st.progress(fortschritt)
 st.divider()
 
 # ==========================================
-# 5. KI MULTI-UPLOAD ODER TEXT-INPUT TRACKER
+# 5. KI MULTI-UPLOAD ODER TEXT-INPUT TRACKER (KOMPRIMIERT)
 # ==========================================
 st.subheader("📸 Mahlzeit tracken")
 
-# Zähler für den Reset von Uploader UND Textfeld, falls noch nicht vorhanden
 if "file_uploader_key" not in st.session_state:
     st.session_state["file_uploader_key"] = 0
 
@@ -160,20 +159,25 @@ if st.button("🚀 Mahlzeit analysieren & speichern", use_container_width=True):
                         elif image.mode != "RGB":
                             image = image.convert("RGB")
                             
+                        # --- NEU: BILD GRÖSSE REDUZIEREN (Komprimierung für Supabase) ---
+                        # Wir begrenzen die maximale Breite/Höhe auf 500 Pixel für die DB-Schonung
+                        image.thumbnail((500, 500))
+                        
                         img_byte_arr = io.BytesIO()
-                        image.save(img_byte_arr, format='JPEG', quality=85)
+                        # Qualität auf 60% senken (reicht für die Vorschau völlig aus und spart 90% Speicher)
+                        image.save(img_byte_arr, format='JPEG', quality=60)
                         img_bytes = img_byte_arr.getvalue()
                         
                         b64_str = base64.b64encode(img_bytes).decode('utf-8')
                         alle_bilder_base64.append(b64_str)
                         
+                        # Für Google Gemini nutzen wir das komprimierte Byte-Array
                         ai_contents.append({
                             "mime_type": "image/jpeg",
                             "data": img_bytes
                         })
                     bilder_string_fuer_db = ",".join(alle_bilder_base64)
                     
-# DIESER PROMPT IST JETZT LINKSBÜNDIG UND SICHER VOR FEHLERN
                     prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte.
 Die beigefügten Bilder zeigen die einzelnen ZUTATEN (Anzahl: {len(uploaded_files)}) für EINE EINZIGE gemeinsame Mahlzeit.
 
@@ -190,7 +194,6 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Codeblöcke oder Text dru
                 
                 # --- WEG B: Es wurde NUR TEXT eingegeben ---
                 else:
-# AUCH DIESER PROMPT IST SICHRE FORMARTIERT
                     prompt = f"""Du bist ein professioneller Ernährungsberater und Kalorien-Experte.
 Der Nutzer hat keine Bilder geschickt, sondern folgenden Text eingegeben: "{text_mahlzeit}"
 
