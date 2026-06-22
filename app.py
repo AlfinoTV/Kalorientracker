@@ -301,108 +301,151 @@ else:
 
 
 # ==========================================
-# 7. BUNTES WOCHENBERICHT-KAPITEL MIT DYNAMISCHEM ZIEL
+# 7. AUTOMATISCHER WOCHENBERICHT & ARCHIV
 # ==========================================
 st.divider()
-
-# Hier erstellen wir eine kleine, einklappbare Box für die Einstellungen
-with st.expander("⚙️ Kalorienziel anpassen", expanded=False):
-    # Streamlit merkt sich die Eingabe automatisch im Browser-Speicher (Session State)
-    if "tages_ziel_kcal" not in st.session_state:
-        st.session_state["tages_ziel_kcal"] = 2000 # Standardwert, falls noch nichts eingegeben wurde
-        
-    neues_ziel = st.number_input(
-        "Dein tägliches Kalorienziel (kcal):", 
-        min_value=1200, 
-        max_value=5000, 
-        value=int(st.session_state["tages_ziel_kcal"]), 
-        step=50
-    )
-    # Wert aktualisieren, wenn er geändert wird
-    st.session_state["tages_ziel_kcal"] = neues_ziel
-
-# Berechnungen basierend auf deiner Live-Eingabe oben
-TAGES_ZIEL_KCAL = st.session_state["tages_ziel_kcal"]
-WOCHEN_ZIEL_KCAL = TAGES_ZIEL_KCAL * 7
-
 st.subheader("📊 Dein Fitness-Status")
 
-if st.button("📅 Bunten Wochenbericht anzeigen", use_container_width=True):
-    with st.spinner("Berechne Wochenübersicht mit deinem Ziel..."):
+# 1. AUTOMATISCHES AUSLESEN: Wir holen das Tagesziel direkt aus deinem Code/State.
+# Falls deine App eine Variable dafür nutzt (z.B. st.session_state['tages_ziel']), liest sie es hier aus.
+# Falls nicht, nutzt sie die unten stehenden 2000 kcal als Fallback.
+TAGES_ZIEL_KCAL = st.session_state.get("tages_ziel_kcal", st.session_state.get("tages_ziel", 2000))
+WOCHEN_ZIEL_KCAL = TAGES_ZIEL_KCAL * 7
+
+# CSS für die fliegenden Emojis (Animationen)
+st.markdown("""
+<style>
+@keyframes flyUp {
+    0% { transform: translateY(100vh) translateX(0); opacity: 1; }
+    50% { transform: translateY(50vh) translateX(30px); }
+    100% { transform: translateY(-10vh) translateX(-30px); opacity: 0; }
+}
+.emoji-stream {
+    position: fixed; left: 50%; top: 0; width: 100%; height: 100vh;
+    pointer-events: none; z-index: 9999; overflow: hidden;
+}
+.animated-emoji {
+    position: absolute; font-size: 3rem;
+    animation: flyUp 4s linear infinite;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if st.button("📅 Wochenbericht abrufen", use_container_width=True):
+    with st.spinner("Berechne Übersicht..."):
         try:
-            # Alle Einträge aus Supabase holen
             res = supabase.table("mahlzeiten").select("*").execute()
             alle_eintraege = res.data
             
             if not alle_eintraege:
-                st.info("Noch keine Daten für einen Wochenbericht vorhanden. Trag erst ein paar Mahlzeiten ein! 🍏")
+                st.info("Noch keine Daten für die aktuelle Woche vorhanden.")
             else:
                 import datetime
                 heute = datetime.date.today()
                 vor_einer_woche = heute - datetime.timedelta(days=7)
                 
                 wochen_kalorien = 0
-                
-                # Nur die Mahlzeiten der letzten 7 Tage zusammenrechnen
                 for mahlzeit in alle_eintraege:
                     db_datum = datetime.datetime.strptime(mahlzeit["created_at"][:10], "%Y-%m-%d").date()
                     if vor_einer_woche <= db_datum <= heute:
                         wochen_kalorien += int(mahlzeit["kalorien"])
                 
-                # Berechnung der Differenz mit dem neuen, dynamischen Ziel
                 differenz = wochen_kalorien - WOCHEN_ZIEL_KCAL
                 
-                st.markdown(f"### 🏆 Dein Wochenbericht (Ziel: {TAGES_ZIEL_KCAL} kcal / Tag)")
+                st.markdown(f"### 🏆 Aktueller Bericht (Basis: {TAGES_ZIEL_KCAL} kcal / Tag)")
                 
-                # Schöne bunte Kacheln für die Zahlen
                 col1, col2, col3 = st.columns(3)
-                
                 with col1:
-                    st.metric(
-                        label="Ist-Zustand (Gegessen)", 
-                        value=f"{wochen_kalorien} kcal"
-                    )
-                    
+                    st.metric(label="Ist (Gegessen)", value=f"{wochen_kalorien} kcal")
                 with col2:
-                    st.metric(
-                        label="Soll-Zustand (Ziel)", 
-                        value=f"{WOCHEN_ZIEL_KCAL} kcal"
-                    )
-                    
+                    st.metric(label="Soll (Ziel)", value=f"{WOCHEN_ZIEL_KCAL} kcal")
                 with col3:
-                    if differenz > 0:
-                        st.metric(
-                            label="Überschuss (Zuviel)", 
-                            value=f"+{differenz} kcal", 
-                            delta=f"{differenz} kcal zu viel", 
-                            delta_color="inverse"
-                        )
-                    elif differenz < 0:
+                    # DIE NEUE FARB- UND TEXTLOGIK:
+                    if differenz < 0:
+                        # Zu wenig gegessen -> ROT leuchtend (Sicherheits-Farbe "inverse")
                         st.metric(
                             label="Defizit (Zuwenig)", 
                             value=f"{differenz} kcal", 
-                            delta=f"{abs(differenz)} kcal übrig", 
-                            delta_color="normal"
+                            delta=f"{abs(differenz)} kcal zu wenig!", 
+                            delta_color="inverse" 
                         )
+                        # Heulemoji-Regen aktivieren
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:20%; animation-delay:0s;">😭</span>'
+                                    '<span class="animated-emoji" style="left:40%; animation-delay:1s;">😢</span>'
+                                    '<span class="animated-emoji" style="left:60%; animation-delay:0.5s;">😭</span>'
+                                    '<span class="animated-emoji" style="left:80%; animation-delay:1.5s;">🐳</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.warning("⚠️ Achtung: Du hast zu wenig gegessen! Pack dir ruhig noch was auf den Teller.")
+                        
+                    elif differenz == 0:
+                        # Exakt getroffen -> GRÜN + Hervorragend
+                        st.metric(label="Punktlandung", value="0 kcal", delta="Hervorragend!", delta_color="normal")
+                        st.balloons() # Echtes Streamlit-Konfetti werfen!
+                        st.success("🎉 Hervorragend! Punktlandung vollbracht!")
+                        
                     else:
-                        st.metric(
-                            label="Punktlandung", 
-                            value="0 kcal", 
-                            delta="Perfekt getroffen!"
-                        )
-                
-                # Bunter Fortschrittsbalken
-                prozent = min(int((wochen_kalorien / WOCHEN_ZIEL_KCAL) * 100), 100) if WOCHEN_ZIEL_KCAL > 0 else 0
-                
-                st.write("")
-                st.write(f"**Fortschritt deines Wochenbudgets ({prozent}%):**")
-                
-                if wochen_kalorien > WOCHEN_ZIEL_KCAL:
-                    st.progress(1.0)
-                    st.error("⚠️ Du hast dein Wochenziel überschritten! Zeit für ein bisschen Cardio. 🏃‍♂️")
-                else:
-                    st.progress(wochen_kalorien / WOCHEN_ZIEL_KCAL)
-                    st.success("🎉 Alles im grünen Bereich! Du trackst überragend. Weiter so!")
-                    
+                        # Zu viel gegessen -> Schulterzucken + Nicht schlimm
+                        st.metric(label="Überschuss (Zuviel)", value=f"+{differenz} kcal", delta=f"{differenz} kcal drüber", delta_color="off")
+                        # Schulterzucken-Emoji aktivieren
+                        st.markdown('<div class="emoji-stream">'
+                                    '<span class="animated-emoji" style="left:30%; animation-delay:0s;">🤷‍♂️</span>'
+                                    '<span class="animated-emoji" style="left:50%; animation-delay:1.2s;">🤷</span>'
+                                    '<span class="animated-emoji" style="left:70%; animation-delay:0.6s;">🤷‍♀️</span>'
+                                    '</div>', unsafe_allow_html=True)
+                        st.info("🤷 Nicht schlimm! Morgen wird einfach wieder normal weitergetrackt.")
+                        
         except Exception as e:
-            st.error(f"Fehler beim Laden des Wochenberichts: {e}")
+            st.error(f"Fehler beim Laden: {e}")
+
+# ==========================================
+# AUTOMATISCHER FIXER WOCHENVERLAUF (ARCHIV)
+# ==========================================
+st.write("")
+st.markdown("### 📁 Archivierte Wochenberichte")
+
+try:
+    res = supabase.table("mahlzeiten").select("*").execute()
+    alle_daten = res.data
+
+    if alle_daten:
+        import datetime
+        from collections import defaultdict
+        
+        # Mahlzeiten nach Kalenderwochen (KW) gruppieren
+        wochen_gruppen = defaultdict(list)
+        
+        for mahlzeit in alle_daten:
+            db_datum = datetime.datetime.strptime(mahlzeit["created_at"][:10], "%Y-%m-%d").date()
+            jahr, kw, _ = db_datum.isocalendar()
+            wochen_gruppen[f"Jahr {jahr} - Kalenderwoche {kw}"].append(mahlzeit)
+            
+        # Jede Woche kompakt als aufklappbaren Verlauf anzeigen (wie Schritt 6)
+        for woche_name, mahlzeiten_der_woche in sorted(wochen_gruppen.items(), reverse=True):
+            gesamte_wochen_kcal = sum(int(m["kalorien"]) for m in mahlzeiten_der_woche)
+            
+            # Berechnung des Soll-Werts für diese Woche
+            wochen_soll = WOCHEN_ZIEL_KCAL
+            diff = gesamte_wochen_kcal - wochen_soll
+            
+            # Status-Text für die Kopfzeile ermitteln
+            if diff < 0:
+                status_text = f"🔴 {gesamte_wochen_kcal} kcal / {wochen_soll} kcal (Zu wenig)"
+            elif diff == 0:
+                status_text = f"🟢 {gesamte_wochen_kcal} kcal (Hervorragend!)"
+            else:
+                status_text = f"⚪ {gesamte_wochen_kcal} kcal / {wochen_soll} kcal (Nicht schlimm)"
+                
+            # Kleiner kompakter Klapptext (Expander)
+            with st.expander(f"📅 {woche_name} ➔ {status_text}"):
+                st.write(f"**Zusammenfassung:**")
+                st.write(f"• Insgesamt gegessen: `{gesamte_wochen_kcal} kcal`")
+                st.write(f"• Wochen-Soll: `{wochen_soll} kcal`")
+                st.write(f"• Abweichung: `{diff} kcal`")
+                
+                # Zeigt die einzelnen Mahlzeiten dieser Woche kurz als Liste an
+                st.write("**Details dieser Woche:**")
+                for m in mahlzeiten_der_woche:
+                    st.write(f"• {m['created_at'][:10]} | *{m['gericht']}* ({m['kalorien']} kcal)")
+except Exception as e:
+    st.error(f"Fehler beim Generieren des Archivs: {e}")
