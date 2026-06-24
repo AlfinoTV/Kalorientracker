@@ -36,8 +36,13 @@ def update_tagesziel(neu_ziel):
         st.error(f"Fehler beim Speichern des Tagesziels: {e}")
 
 def get_mahlzeiten():
-    res = supabase.table("mahlzeiten").select("*").order("created_at", desc=True).execute()
-    return res.data if res.data else []
+    try:
+        res = supabase.table("mahlzeiten").select("*").order("created_at", desc=True).execute()
+        return res.data if res.data else []
+    except Exception as e:
+        # Falls die Datenbank zickt, stürzt nicht die ganze App ab!
+        st.sidebar.error(f"Datenbank-Fehler: {e}")
+        return []
 
 def add_mahlzeit(gericht, kalorien, bild_base64=""):
     supabase.table("mahlzeiten").insert({
