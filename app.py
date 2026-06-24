@@ -12,7 +12,7 @@ from datetime import datetime, date
 # ==========================================
 st.set_page_config(page_title="Kalorien Tracker", page_icon="🍏", layout="centered")
 
-GOOGLE_API_KEY = "AQ.Ab8RN6LOTJL7P7ayrCUzoW7oaScrfp69O2ebr5CrnX_3w3iVvg"
+GOOGLE_API_KEY = "AQ.Ab8RN6Ifi6Pi8Jr6rJ38oVTRzWstHGuH40QXcJo04rGX5d8RMQ"
 SUPABASE_URL = "https://jqywogdgttgcvrzltgit.supabase.co"
 SUPABASE_KEY = "sb_publishable_HIxDWl3-q_BB2wtSD2a-Uw_z6HeO8Be"
 
