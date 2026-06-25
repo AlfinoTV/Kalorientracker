@@ -315,43 +315,6 @@ else:
                     delete_mahlzeit(item['id'])
                     st.rerun()
 
-                    # ==========================================
-# 5.1 MANUELLE EINGABE (OHNE KI)
-# ==========================================
-st.write("")
-with st.expander("✏️ Mahlzeit manuell eintragen (Ohne KI)", expanded=False):
-    # Eindeutige Keys, damit Streamlit sich nicht verschluckt
-    manuell_gericht = st.text_input(
-        "Was hast du gegessen?", 
-        placeholder="z.B. Proteinriegel, Apfel, Haferflocken...",
-        key="manuell_gericht_input"
-    )
-    
-    manuell_kalorien = st.number_input(
-        "Kalorienanzahl (kcal):", 
-        min_value=0, 
-        max_value=5000, 
-        value=0, 
-        step=10,
-        key="manuell_kalorien_input"
-    )
-    
-    if st.button("💾 Manuell speichern", use_container_width=True, key="manuell_speichern_btn"):
-        if not manuell_gericht.strip():
-            st.warning("Bitte gib einen Namen für das Gericht ein! 😉")
-        elif manuell_kalorien <= 0:
-            st.warning("Bitte gib die Kalorien an! 😉")
-        else:
-            try:
-                # Direktes Abspeichern in Supabase ohne Umweg über Gemini
-                # Da kein Bild hochgeladen wird, bleibt der Bild-String leer ("")
-                add_mahlzeit(manuell_gericht.strip(), int(manuell_kalorien), "")
-                
-                st.success(f"Manuell eingetragen: {manuell_gericht.strip()} ({manuell_kalorien} kcal)")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Fehler beim manuellen Speichern: {e}")
-
 # ==========================================
 # 7. VERLAUF DER LETZTEN TAGE
 # ==========================================
